@@ -30,10 +30,15 @@ function validPublicTarget(value) {
     const octets = ipv4.slice(1).map(Number);
     if (octets.some(n => n > 255)) return false;
     const [a, b] = octets;
+    const [c] = octets.slice(2);
     if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
     if (a === 169 && b === 254) return false;
     if (a === 172 && b >= 16 && b <= 31) return false;
-    if (a === 192 && b === 168) return false;
+    if (a === 192 && (b === 0 || b === 2 || b === 168)) return false;
+    if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
+    if (a === 203 && b === 0 && c === 113) return false;
+    if (a === 255 && b === 255 && c === 255 && octets[3] === 255) return false;
     return true;
   }
 
@@ -70,9 +75,7 @@ export async function onRequest({ request, env }) {
     return json({ ok: false, error: "Select between 1 and 5 supported countries.", supportedCountries: Object.keys(COUNTRIES) }, 400);
   }
 
-  const created = [];
-  const failures = [];
-  for (const code of countries) {
+  const outcomes = await Promise.all(countries.map(async code => {
     try {
       const upstream = await fetch("https://atlas.ripe.net/api/v2/measurements/", {
         method: "POST",
@@ -95,14 +98,15 @@ export async function onRequest({ request, env }) {
 
       const data = await upstream.json().catch(() => ({}));
       if (!upstream.ok || !Array.isArray(data.measurements) || !data.measurements[0]) {
-        failures.push({ country: code, name: COUNTRIES[code], status: upstream.status, error: data.detail || data.error || "RIPE Atlas rejected the measurement" });
-      } else {
-        created.push({ country: code, name: COUNTRIES[code], measurementId: data.measurements[0] });
+        return { failure: { country: code, name: COUNTRIES[code], status: upstream.status, error: data.detail || data.error || "RIPE Atlas rejected the measurement" } };
       }
+      return { created: { country: code, name: COUNTRIES[code], measurementId: data.measurements[0] } };
     } catch {
-      failures.push({ country: code, name: COUNTRIES[code], error: "RIPE Atlas request failed" });
+      return { failure: { country: code, name: COUNTRIES[code], error: "RIPE Atlas request failed" } };
     }
-  }
+  }));
+  const created = outcomes.filter(item => item.created).map(item => item.created);
+  const failures = outcomes.filter(item => item.failure).map(item => item.failure);
 
   return json({
     ok: created.length > 0,
