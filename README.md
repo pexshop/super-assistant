@@ -31,3 +31,17 @@ The site is a static `index.html`; no build step, server, paid API key, or datab
 This is an independent helper, not an official VPN Super product. A website cannot read or control VPN Super's private server list, inspect the iOS system VPN status, force reconnection, keep a system VPN tunnel alive, or guarantee background monitoring. iOS Safari may suspend timers when backgrounded or locked. Browser HTTPS timings are not ICMP ping or VPN-node latency. DNS notes are not a certified DNS-leak audit.
 
 Some tests contact public third-party endpoints. Their availability, CORS policies, rate limits, and privacy practices may change. Do not enter VPN passwords, private keys, or configuration secrets.
+
+## Cloudflare Pages Functions API
+
+The `functions/api/probe.js` endpoint adds a server-side probe API when the repository is deployed as a **Cloudflare Pages** project with Functions enabled (the standard Git-connected Pages deployment supports this automatically).
+
+Examples:
+
+- `/api/probe` — probe Cloudflare's public trace endpoint
+- `/api/probe?target=ipify` — check reachability of the public IP lookup endpoint
+- `/api/probe?target=speed` — request a small Cloudflare speed-test sample
+
+The response includes request latency and the Cloudflare edge colo/country that handled this request, when available. This is a single edge-location test, **not** a global multi-region test and not a test of private VPN nodes. Only fixed allowlisted upstream targets are accepted; arbitrary URLs cannot be submitted, which helps prevent server-side request forgery.
+
+After connecting this repository to Cloudflare Pages, test `https://YOUR-PAGES-DOMAIN/api/probe`. The existing `workers.dev` URL is a separate Worker deployment and will not automatically receive Pages Functions from this repository.
