@@ -54,3 +54,16 @@ After connecting this repository to Cloudflare Pages, test `https://YOUR-PAGES-D
 - Root directory: `/` (repository root), if the dashboard asks for it separately.
 - Confirm the selected production branch is `main`.
 - In the latest deployment details, inspect the build log; a GitHub commit alone does not trigger a deployment unless the Pages project is connected to this repository.
+
+
+## VPN Super API v1.0
+
+The repository includes a read-only API layer:
+
+- `GET /api/health` — service status and version.
+- `GET /api/probe?target=cloudflare` — one fixed allowlisted upstream probe.
+- `GET /api/diagnostics` — all seven allowlisted checks in parallel.
+- `docs/vpn-super-api.md` — endpoint usage, deployment and security notes.
+- `openapi.yaml` — OpenAPI 3.1 description.
+
+After deployment, test `/api/health` and `/api/diagnostics` on the Pages domain. Configure Cloudflare WAF/rate limiting for public `/api/*` endpoints. Checks originate from the Cloudflare edge and do not inspect private VPN provider nodes or iOS system VPN state.
