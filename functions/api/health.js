@@ -1,5 +1,5 @@
 function reply(data, status = 200) {
-  return new Response(JSON.stringify(data), {
+  return new Response(status === 204 ? null : JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
