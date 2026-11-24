@@ -52,3 +52,48 @@ paths:
       responses:
         "200": { description: All checks passed }
         "207": { description: Partial check failure }
+
+  /api/regions/start:
+    post:
+      summary: Create one-off RIPE Atlas ping measurements in selected countries
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target, countries]
+              properties:
+                target: { type: string, description: Public hostname or IPv4 address }
+                countries:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, enum: [NL, US, DE, SG, JP] }
+      responses:
+        "200": { description: Measurement IDs created }
+        "401": { description: Invalid application key }
+        "503": { description: Required Cloudflare secrets are not configured }
+  /api/regions/results:
+    get:
+      summary: Retrieve latest results for regional measurements
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: ids
+          required: true
+          schema: { type: string }
+        - in: query
+          name: countries
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Per-probe results and RTT samples }
+        "401": { description: Invalid application key }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
