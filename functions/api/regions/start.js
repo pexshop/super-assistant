@@ -90,7 +90,8 @@ export async function onRequest({ request, env }) {
             description: "VPN Super regional probe " + code + " " + new Date().toISOString(),
             type: "ping",
             af: 4,
-            packets: 3
+            packets: 3,
+            is_oneoff: true
           }],
           probes: [{ requested: 3, type: "countries", value: code }]
         })
