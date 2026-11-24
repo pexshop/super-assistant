@@ -17,6 +17,7 @@
 <button class="card tool" onclick="run('latency')">⚡<strong>HTTPS 延迟测试</strong><small>测量公共端点请求耗时</small></button>
 <button class="card tool" onclick="run('https')">🔒<strong>HTTPS 连通性</strong><small>测试 Cloudflare 端点</small></button>
 <button class="card tool" onclick="run('server')">🛰️<strong>服务器端探测</strong><small>通过 Cloudflare 后端测试出口连通性</small></button>
+<button class="card tool" onclick="run('api')">🧠<strong>VPN Super API 总检</strong><small>调用后端 API 批量检测全部外部服务</small></button>
 <button class="card tool" onclick="run('services')">🔗<strong>外部服务健康检查</strong><small>检测 Cloudflare、Google、IP 与 DoH 服务</small></button>
 <button class="card tool" onclick="run('dns')">🧭<strong>DNS 检查说明</strong><small>解释网页检测限制</small></button>
 </section>
@@ -41,6 +42,7 @@ else if(k==='latency'){let a=[];for(let u of ['https://www.cloudflare.com/cdn-cg
 else if(k==='https'){let t=performance.now();await request('https://www.cloudflare.com/cdn-cgi/trace');s='Cloudflare HTTPS 可访问\n请求耗时：'+Math.round(performance.now()-t)+' ms\n时间：'+stamp()}
 else if(k==='server'){let r=await request('/api/probe');let d;try{d=await r.json()}catch(_){throw Error('API 返回的不是 JSON。请确认已部署为 Cloudflare Pages，而不是旧的 workers.dev Worker；HTTP '+r.status)}s=(d.ok?'服务器端探测成功':'服务器端探测失败')+'\n目标：'+(d.target||'cloudflare')+'\n上游状态：'+(d.upstreamStatus||'无')+'\n耗时：'+(d.latencyMs??'未知')+' ms\nCloudflare 边缘机房：'+(d.edgeColo||'未知')+'\n国家/地区：'+(d.country||'未知')+'\n检测时间：'+(d.checkedAt||stamp())+'\n\n注意：这是当前请求经过的单个 Cloudflare 边缘位置，不代表全球节点检测或 VPN 私有节点状态。';if(!r.ok&&!d.error) s+='\n请求状态：'+r.status}
 
+else if(k==='api'){const r=await request('/api/diagnostics');const d=await r.json();s='VPN Super API 总检\n状态：'+(d.ok?'全部通过':'存在异常')+'\n通过：'+(d.summary?.passed??0)+' / '+(d.summary?.total??0)+'\n检测耗时：'+(d.summary?.durationMs??'—')+' ms\n边缘位置：'+(d.edge?.colo||'未知')+' / '+(d.edge?.country||'未知')+'\n\n'+(d.results||[]).map(x=>x.id+'：'+(x.ok?'正常':'异常')+' · '+x.latencyMs+' ms'+(x.error?' · '+x.error:'')).join('\n')+'\n\nAPI 文档：/docs/vpn-super-api.md';}
 else if(k==='services'){
  const targets=[
   ['cloudflare','Cloudflare Trace'],['google','Google HTTPS'],['ipify','ipify 公网 IP'],
