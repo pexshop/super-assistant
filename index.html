@@ -23,6 +23,29 @@
 </section>
 <section class="card" style="margin-top:12px"><b>检测结果</b><div id="result" class="result">选择一个工具开始检测。</div><div class="row" style="margin-top:9px"><button onclick="copyResult()">复制结果</button><button onclick="clearResult()">清除</button><button onclick="downloadReport()">导出报告</button></div></section>
 <div class="section">持续连通性监测</div><section class="card"><p class="muted">每 15 秒请求一次 HTTPS 测试端点。iOS 切换后台或锁屏时可能暂停网页计时器。</p><div class="row"><button class="primary" id="monitorBtn" onclick="toggleMonitor()">开始监测</button><span id="monitorState" class="muted">未运行</span></div><div id="monitor" class="result">暂无记录</div></section>
+<div class="section">多地区服务器探测</div>
+<section class="card">
+<p class="muted">通过 RIPE Atlas 真实分布式探测器，对指定公网目标进行一次性 IPv4 Ping。每个地区最多请求 3 个探测器；实际数量取决于当地在线探测器。</p>
+<label for="regionTarget"><b>目标域名或公网 IPv4</b></label>
+<input id="regionTarget" class="field" value="example.com" autocomplete="url" placeholder="example.com 或公网 IPv4">
+<label for="regionApiKey"><b>VPN Super API 访问密钥</b></label>
+<input id="regionApiKey" class="field" type="password" autocomplete="off" placeholder="输入你在 Cloudflare 设置的 VPN_SUPER_API_KEY">
+<div class="muted">此密钥只在本次页面会话中使用，不会写入 GitHub 或保存到浏览器。</div>
+<div style="margin:12px 0 8px"><b>选择探测地区</b></div>
+<div class="row" style="gap:14px">
+<label><input type="checkbox" name="regionCountry" value="NL" checked> 🇳🇱 荷兰</label>
+<label><input type="checkbox" name="regionCountry" value="US" checked> 🇺🇸 美国</label>
+<label><input type="checkbox" name="regionCountry" value="DE" checked> 🇩🇪 德国</label>
+<label><input type="checkbox" name="regionCountry" value="SG"> 🇸🇬 新加坡</label>
+<label><input type="checkbox" name="regionCountry" value="JP"> 🇯🇵 日本</label>
+</div>
+<div class="row" style="margin-top:12px">
+<button class="primary" id="regionStartBtn" onclick="startRegionalProbe()">启动多地区探测</button>
+<button id="regionRefreshBtn" onclick="refreshRegionalProbe()" disabled>刷新结果</button>
+</div>
+<div id="regionResult" class="result">等待配置 RIPE Atlas 密钥并启动探测。</div>
+<div class="notice">需要在 Cloudflare Pages 配置加密密钥 VPN_SUPER_API_KEY 和 RIPE_ATLAS_API_KEY。RIPE Atlas 测量会消耗其 credits；此功能不会自动连续运行。</div>
+</section>
 <div class="section">50 项工具目录</div><section class="card catalog" id="catalog"></section>
 <div class="section">故障排查助手</div><section class="card"><label for="issue"><b>选择遇到的问题</b></label><select id="issue" class="field"><option value="disconnect">VPN 自动断开</option><option value="connected">显示已连接但无法上网</option><option value="slow">连接速度很慢</option><option value="ip">连接后 IP 没变化</option><option value="dns">部分网站无法打开</option><option value="wifi">Wi-Fi 可用但移动数据不行</option><option value="mobile">移动数据下 VPN 无法连接</option><option value="none">VPN 完全无法连接</option></select><button class="primary" onclick="diagnose()">生成排查步骤</button><div id="advice" class="result">选择问题后生成建议。</div></section>
 <div class="section">隐私与限制</div><section class="card"><p class="muted">本网站是独立辅助工具，不是 VPN Super 官方产品，不读取或控制 VPN Super 私有节点，也不要求 VPN 账号、密码或配置密钥。公网 IP 查询会向第三方查询服务发送请求。</p><div class="notice">iPhone Safari 网页不能读取系统 VPN 状态、强制 VPN 自动重连、保持系统级隧道、读取 VPN 私有节点或保证后台监测。DNS 检查说明不等于完整 DNS 泄漏审计；HTTPS 请求耗时不是 ICMP Ping，也不是 VPN 节点延迟。</div></section>
@@ -114,6 +137,55 @@ async function openCatalogTool(i,n){
  show(n+'\n\n'+out);
  }catch(e){show(n+' 打开失败：'+(e.message||'未知错误')+'\n请重试。')}
  finally{$('status').textContent='● 工具已就绪 · '+stamp()}
+}
+let regionalMeasurements=[];
+async function startRegionalProbe(){
+ const target=$('regionTarget').value.trim();
+ const key=$('regionApiKey').value.trim();
+ const countries=[...document.querySelectorAll('input[name="regionCountry"]:checked')].map(x=>x.value);
+ if(!key){$('regionResult').textContent='请先输入 VPN Super API 访问密钥。';return}
+ if(!target){$('regionResult').textContent='请输入目标域名或公网 IPv4。';return}
+ if(!countries.length){$('regionResult').textContent='至少选择一个地区。';return}
+ $('regionStartBtn').disabled=true;
+ $('regionResult').textContent='正在向 RIPE Atlas 创建一次性多地区测量…';
+ try{
+  const r=await request('/api/regions/start',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+key},body:JSON.stringify({target,countries})});
+  const d=await r.json();
+  if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+  regionalMeasurements=d.created||[];
+  const lines=['目标：'+d.target,'已创建测量：'+regionalMeasurements.length,''];
+  lines.push(...regionalMeasurements.map(x=>x.name+'：测量 ID '+x.measurementId));
+  if(d.failures?.length)lines.push('创建失败：',...d.failures.map(x=>x.name+'：'+(x.error||x.status)));
+  lines.push('',d.note||'');
+  $('regionResult').textContent=lines.join('\n');
+  $('regionRefreshBtn').disabled=!regionalMeasurements.length;
+ }catch(e){$('regionResult').textContent='启动失败：'+(e.message||'请求失败')+'\n请确认 Cloudflare Secrets 和 RIPE Atlas API 权限已配置。'}
+ finally{$('regionStartBtn').disabled=false}
+}
+async function refreshRegionalProbe(){
+ const key=$('regionApiKey').value.trim();
+ if(!key||!regionalMeasurements.length){$('regionResult').textContent='请先输入密钥并创建测量。';return}
+ $('regionRefreshBtn').disabled=true;
+ $('regionResult').textContent='正在读取各地区最新探测结果…';
+ try{
+  const ids=regionalMeasurements.map(x=>x.measurementId).join(',');
+  const countries=regionalMeasurements.map(x=>x.country).join(',');
+  const r=await request('/api/regions/results?ids='+encodeURIComponent(ids)+'&countries='+encodeURIComponent(countries),{headers:{'authorization':'Bearer '+key}});
+  const d=await r.json();
+  if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+  const lines=['检测时间：'+d.checkedAt,''];
+  for(const region of d.results||[]){
+   lines.push(region.countryName+' ('+region.country+') — '+(region.ready?'已收到结果':'等待探测器结果'));
+   if(region.averageRttMs!==null&&region.averageRttMs!==undefined)lines.push('平均 RTT：'+region.averageRttMs+' ms');
+   if(region.probeCount!==undefined)lines.push('探测器数量：'+region.probeCount);
+   if(region.error)lines.push('错误：'+region.error);
+   for(const p of region.probes||[])lines.push('探测器 '+p.probeId+'：'+(p.averageRttMs===null?'暂无 RTT':p.averageRttMs+' ms')+' · 收到 '+p.received+'/'+p.packets+' 包');
+   lines.push('');
+  }
+  lines.push(d.note||'');
+  $('regionResult').textContent=lines.join('\n');
+ }catch(e){$('regionResult').textContent='读取失败：'+(e.message||'请求失败')}
+ finally{$('regionRefreshBtn').disabled=false}
 }
 function diagnose(){let m={disconnect:'1. 检查 VPN Super 内自动连接及断线保护选项。\n2. 暂时关闭低电量模式进行对比。\n3. 检查 iOS VPN 配置是否仍存在。\n4. 分别测试 Wi-Fi 与蜂窝网络。',connected:'1. 断开后重新连接 VPN。\n2. 检测公网 IP 与 HTTPS。\n3. 检查 DNS 与分流设置。',slow:'1. 比较 VPN 开启前后的请求耗时。\n2. 更换应用内可选服务器。\n3. 检查网络信号与后台下载。',ip:'1. 重新查询公网 IP。\n2. 检查分流设置。\n3. 向 VPN Super 支持确认出口策略。',dns:'1. 检查 VPN 的 DNS 保护设置。\n2. 检查 iOS 自定义 DNS 或内容过滤配置。\n3. 使用可信 DNS 泄漏测试复核。',wifi:'1. 确认蜂窝数据允许 VPN Super 使用。\n2. 对比其他 Wi-Fi。\n3. 重启应用后测试。',mobile:'1. 确认 iPhone 设置中已允许 VPN Super 使用蜂窝数据。\n2. 检查蜂窝数据流量是否耗尽或受运营商限制。\n3. 开关飞行模式后重新连接，并与 Wi-Fi 结果对比。',none:'1. 确认普通互联网可用。\n2. 更新并重启 VPN Super。\n3. 检查 iOS VPN 配置。\n4. 联系官方支持。'};$('advice').textContent=m[$('issue').value]}
 addEventListener('online',()=>$('status').textContent='● 浏览器报告网络在线');addEventListener('offline',()=>$('status').textContent='● 浏览器报告网络离线');
