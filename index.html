@@ -25,12 +25,12 @@
 <div class="section">持续连通性监测</div><section class="card"><p class="muted">每 15 秒请求一次 HTTPS 测试端点。iOS 切换后台或锁屏时可能暂停网页计时器。</p><div class="row"><button class="primary" id="monitorBtn" onclick="toggleMonitor()">开始监测</button><span id="monitorState" class="muted">未运行</span></div><div id="monitor" class="result">暂无记录</div></section>
 <div class="section">多地区服务器探测</div>
 <section class="card">
-<p class="muted">通过 RIPE Atlas 真实分布式探测器，对指定公网目标进行一次性 IPv4 Ping。每个地区最多请求 3 个探测器；实际数量取决于当地在线探测器。</p>
+<p class="muted">使用 Globalping 全球公开探测网络，从所选国家对公网目标执行 Ping。无需 Globalping 账号或供应商 API Key；公开 API 有速率限制，节点数量取决于地区在线探测器。</p>
 <label for="regionTarget"><b>目标域名或公网 IPv4</b></label>
 <input id="regionTarget" class="field" value="example.com" autocomplete="url" placeholder="example.com 或公网 IPv4">
-<label for="regionApiKey"><b>VPN Super API 访问密钥</b></label>
-<input id="regionApiKey" class="field" type="password" autocomplete="off" placeholder="输入你在 Cloudflare 设置的 VPN_SUPER_API_KEY">
-<div class="muted">此密钥只在本次页面会话中使用，不会写入 GitHub 或保存到浏览器。</div>
+<label for="regionApiKey"><b>VPN Super Assistant 网站访问密钥</b></label>
+<input id="regionApiKey" class="field" type="password" autocomplete="off" placeholder="输入 Cloudflare 中设置的 VPN_SUPER_API_KEY">
+<div class="muted">这是你网站自己的访问保护密钥，不是 Globalping 的 Key；仅在当前页面会话使用。</div>
 <div style="margin:12px 0 8px"><b>选择探测地区</b></div>
 <div class="row" style="gap:14px">
 <label><input type="checkbox" name="regionCountry" value="NL" checked> 🇳🇱 荷兰</label>
@@ -43,8 +43,8 @@
 <button class="primary" id="regionStartBtn" onclick="startRegionalProbe()">启动多地区探测</button>
 <button id="regionRefreshBtn" onclick="refreshRegionalProbe()" disabled>刷新结果</button>
 </div>
-<div id="regionResult" class="result">等待配置 RIPE Atlas 密钥并启动探测。</div>
-<div class="notice">需要在 Cloudflare Pages 配置加密密钥 VPN_SUPER_API_KEY 和 RIPE_ATLAS_API_KEY。RIPE Atlas 测量会消耗其 credits；此功能不会自动连续运行。</div>
+<div id="regionResult" class="result">输入网站自己的访问密钥即可启动；无需 Globalping API Key。</div>
+<div class="notice">Cloudflare Pages 只需配置 VPN_SUPER_API_KEY。Globalping 公共 API 无需供应商密钥，但会执行速率限制；请勿高频刷新。</div>
 </section>
 <div class="section">50 项工具目录</div><section class="card catalog" id="catalog"></section>
 <div class="section">故障排查助手</div><section class="card"><label for="issue"><b>选择遇到的问题</b></label><select id="issue" class="field"><option value="disconnect">VPN 自动断开</option><option value="connected">显示已连接但无法上网</option><option value="slow">连接速度很慢</option><option value="ip">连接后 IP 没变化</option><option value="dns">部分网站无法打开</option><option value="wifi">Wi-Fi 可用但移动数据不行</option><option value="mobile">移动数据下 VPN 无法连接</option><option value="none">VPN 完全无法连接</option></select><button class="primary" onclick="diagnose()">生成排查步骤</button><div id="advice" class="result">选择问题后生成建议。</div></section>
@@ -140,50 +140,40 @@ async function openCatalogTool(i,n){
 }
 let regionalMeasurements=[];
 async function startRegionalProbe(){
- const target=$('regionTarget').value.trim();
- const key=$('regionApiKey').value.trim();
+ const target=$('regionTarget').value.trim(),key=$('regionApiKey').value.trim();
  const countries=[...document.querySelectorAll('input[name="regionCountry"]:checked')].map(x=>x.value);
- if(!key){$('regionResult').textContent='请先输入 VPN Super API 访问密钥。';return}
+ if(!key){$('regionResult').textContent='请输入你的网站 VPN_SUPER_API_KEY。';return}
  if(!target){$('regionResult').textContent='请输入目标域名或公网 IPv4。';return}
  if(!countries.length){$('regionResult').textContent='至少选择一个地区。';return}
- $('regionStartBtn').disabled=true;
- $('regionResult').textContent='正在向 RIPE Atlas 创建一次性多地区测量…';
+ $('regionStartBtn').disabled=true;$('regionResult').textContent='正在通过 Globalping 创建多地区探测…';
  try{
   const r=await request('/api/regions/start',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+key},body:JSON.stringify({target,countries})});
-  const d=await r.json();
-  if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+  const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));
   regionalMeasurements=d.created||[];
-  const lines=['目标：'+d.target,'已创建测量：'+regionalMeasurements.length,''];
-  lines.push(...regionalMeasurements.map(x=>x.name+'：测量 ID '+x.measurementId));
+  const lines=['目标：'+d.target,'已创建测量：'+regionalMeasurements.length,'',...regionalMeasurements.map(x=>x.name+'：测量 ID '+x.measurementId)];
   if(d.failures?.length)lines.push('创建失败：',...d.failures.map(x=>x.name+'：'+(x.error||x.status)));
-  lines.push('',d.note||'');
-  $('regionResult').textContent=lines.join('\n');
-  $('regionRefreshBtn').disabled=!regionalMeasurements.length;
- }catch(e){$('regionResult').textContent='启动失败：'+(e.message||'请求失败')+'\n请确认 Cloudflare Secrets 和 RIPE Atlas API 权限已配置。'}
+  lines.push('',d.note||'');$('regionResult').textContent=lines.join('\n');$('regionRefreshBtn').disabled=!regionalMeasurements.length;
+ }catch(e){$('regionResult').textContent='启动失败：'+(e.message||'请求失败')+'\n请确认 Cloudflare Pages 已配置 VPN_SUPER_API_KEY。'}
  finally{$('regionStartBtn').disabled=false}
 }
 async function refreshRegionalProbe(){
- const key=$('regionApiKey').value.trim();
- if(!key||!regionalMeasurements.length){$('regionResult').textContent='请先输入密钥并创建测量。';return}
- $('regionRefreshBtn').disabled=true;
- $('regionResult').textContent='正在读取各地区最新探测结果…';
+ const key=$('regionApiKey').value.trim();if(!key||!regionalMeasurements.length){$('regionResult').textContent='请先输入访问密钥并创建测量。';return}
+ $('regionRefreshBtn').disabled=true;$('regionResult').textContent='正在读取 Globalping 最新结果…';
  try{
-  const ids=regionalMeasurements.map(x=>x.measurementId).join(',');
-  const countries=regionalMeasurements.map(x=>x.country).join(',');
+  const ids=regionalMeasurements.map(x=>x.measurementId).join(','),countries=regionalMeasurements.map(x=>x.country).join(',');
   const r=await request('/api/regions/results?ids='+encodeURIComponent(ids)+'&countries='+encodeURIComponent(countries),{headers:{'authorization':'Bearer '+key}});
-  const d=await r.json();
-  if(!r.ok)throw Error(d.error||('HTTP '+r.status));
+  const d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));
   const lines=['检测时间：'+d.checkedAt,''];
   for(const region of d.results||[]){
-   lines.push(region.countryName+' ('+region.country+') — '+(region.ready?'已收到结果':'等待探测器结果'));
+   lines.push(region.countryName+' ('+region.country+') — '+(region.ready?'已收到结果':'探测进行中或暂无结果'));
+   lines.push('状态：'+region.status);
    if(region.averageRttMs!==null&&region.averageRttMs!==undefined)lines.push('平均 RTT：'+region.averageRttMs+' ms');
-   if(region.probeCount!==undefined)lines.push('探测器数量：'+region.probeCount);
+   if(region.probeCount!==undefined)lines.push('探测结果数：'+region.probeCount);
    if(region.error)lines.push('错误：'+region.error);
-   for(const p of region.probes||[])lines.push('探测器 '+p.probeId+'：'+(p.averageRttMs===null?'暂无 RTT':p.averageRttMs+' ms')+' · 收到 '+p.received+'/'+p.packets+' 包');
+   for(const p of region.probes||[])lines.push((p.city||p.country||'探测节点')+'：'+(p.averageRttMs===null?'暂无 RTT':p.averageRttMs+' ms')+(p.packetLoss!==null?' · 丢包 '+p.packetLoss+'%':''));
    lines.push('');
   }
-  lines.push(d.note||'');
-  $('regionResult').textContent=lines.join('\n');
+  lines.push(d.note||'');$('regionResult').textContent=lines.join('\n');
  }catch(e){$('regionResult').textContent='读取失败：'+(e.message||'请求失败')}
  finally{$('regionRefreshBtn').disabled=false}
 }
