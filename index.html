@@ -46,7 +46,58 @@ async function tick(){let r=await probe(),line=stamp()+' — '+(r.ok?'在线 · 
 async function toggleMonitor(){if(timer){clearInterval(timer);timer=null;$('monitorBtn').textContent='开始监测';$('monitorState').textContent='已停止'}else{$('monitorBtn').textContent='停止监测';$('monitorState').textContent='每 15 秒检测';await tick();timer=setInterval(tick,15000)}}
 function downloadReport(){let a=document.createElement('a'),u=URL.createObjectURL(new Blob([last+'\n导出时间：'+stamp()],{type:'text/plain'}));a.href=u;a.download='vpn-diagnostic.txt';a.click();URL.revokeObjectURL(u)}
 const items=['下载速度估测','上传速度估测','抖动估测','HTTP 请求失败率观察','出口国家查询','DNS 解析速度说明','TLS / HTTPS 检查','网站可访问性测试','TCP 端口检测说明','全球网络测试说明','VPN 节点地图说明','VPN 系统状态读取限制','自动重连限制','Kill Switch 设置检查','VPN 协议识别限制','Wi-Fi / 蜂窝切换观察','断线提醒限制','诊断历史','报告导出','本地智能排查','IPv4 连通性','IPv6 连通性','公网 IP 变化记录','浏览器在线状态','页面可见性状态','HTTPS 响应测试','Cloudflare 连通测试','Google 连通测试','备用端点测试','网络恢复检测','连续响应时间记录','长时间页面监测','网络类型提示','省电模式影响说明','iOS 后台限制说明','VPN 连接前后对比','出口 IP 国家对比','DNS 泄漏审计说明','WebRTC 候选地址','浏览器安全说明','隐私检查清单','VPN 故障问答','无法连接排查','连接后无网排查','速度慢排查','自动断开排查','IP 未变化排查','DNS 错误排查','Wi-Fi 故障排查','移动数据故障排查'];
-items.forEach((n,i)=>{let d=document.createElement('div');d.className='item';d.innerHTML='<span>🛠️</span><span><b>'+n+'</b><small>工具 / 辅助说明</small></span><button>打开</button>';d.querySelector('button').onclick=()=>{if(i===4)run('ip');else if(i===6)run('https');else if(i===18)downloadReport();else if(i===19)diagnose();else show(n+'\n\n此项受 iOS 浏览器权限、CORS、缺少外部探测节点或 VPN Super 私有 API 限制。不会显示虚构结果。')};$('catalog').append(d)});
+items.forEach((n,i)=>{const d=document.createElement('div');d.className='item';const icon=document.createElement('span');icon.textContent='🛠️';const info=document.createElement('span');const title=document.createElement('b');title.textContent=n;const sub=document.createElement('small');sub.textContent='点击打开独立工具';info.append(title,sub);const button=document.createElement('button');button.type='button';button.textContent='打开';button.addEventListener('click',()=>openCatalogTool(i,n));d.append(icon,info,button);$('catalog').append(d)});
+async function catalogRequest(url){const start=performance.now();try{const r=await request(url);return {ok:r.ok||r.type==='opaque',ms:Math.round(performance.now()-start),status:r.status}}catch(e){return {ok:false,ms:Math.round(performance.now()-start),error:e.message||'网络请求失败'}}}
+async function openCatalogTool(i,n){
+ show('正在打开：'+n+'…');$('status').textContent='● '+n;
+ try{
+ let out='';
+ if(i===0){const r=await catalogRequest('https://speed.cloudflare.com/__down?bytes=1000000');out=r.ok?'测速样本请求完成，耗时 '+r.ms+' ms。受浏览器跨域限制，无法保证读取真实下载 Mbps。':'下载测试失败：'+r.error}
+ else if(i===1){out='网页无法可靠测量真实上传带宽。需要允许跨域读取的测速服务；本工具不会把普通请求时间冒充上传速度。'}
+ else if(i===2){let a=[];for(let k=0;k<5;k++){let r=await catalogRequest('https://www.cloudflare.com/cdn-cgi/trace?sample='+k);a.push(r.ms)}out='5 次 HTTPS 请求耗时：'+a.join(' / ')+' ms\n平均：'+Math.round(a.reduce((x,y)=>x+y,0)/a.length)+' ms\n波动范围：'+(Math.max(...a)-Math.min(...a))+' ms（浏览器请求波动估算）'}
+ else if(i===3){let ok=0,a=[];for(let k=0;k<5;k++){let r=await catalogRequest('https://www.cloudflare.com/cdn-cgi/trace?check='+k);if(r.ok)ok++;a.push(r.ok?'成功':'失败')}out='5 次请求：'+a.join('、')+'\n成功率：'+(ok*20)+'%'}
+ else if(i===4||i===36){await run('ip');return}
+ else if(i===5){out='DNS 解析速度需要专用 DNS 查询接口。Safari 不提供系统 DNS 服务器列表；网页请求时间不能当作 DNS 延迟。'}
+ else if([6,25,26,27,28,29].includes(i)){const url=i===27?'https://www.google.com/generate_204':'https://www.cloudflare.com/cdn-cgi/trace';const r=await catalogRequest(url);out=(r.ok?'HTTPS 请求已完成':'HTTPS 请求失败或被浏览器拦截')+'\n耗时：'+r.ms+' ms\nHTTP 状态：'+(r.status||'浏览器未公开')}
+ else if(i===7){out='网站可访问性：网页可尝试打开目标站，但跨域策略可能阻止读取其状态。请直接在 Safari 地址栏输入目标网址，不要提交带密码或令牌的链接。'}
+ else if(i===8){out='TCP 端口检测需要服务器端 TCP 探测。浏览器网页不能任意扫描主机端口，本工具不会执行端口扫描。'}
+ else if(i===9||i===10){out='全球节点与节点地图需要多个地区的真实探测服务器。当前网站没有这些探测节点，也没有 VPN Super 私有节点 API，因此不能提供真实全球节点在线状态。'}
+ else if(i===11){out='iOS Safari 不允许普通网页读取系统 VPN 配置或连接状态。请在 iPhone 设置 → VPN 中查看系统状态。'}
+ else if(i===12){out='网页不能控制 VPN Super 自动重连。请在 VPN Super 应用内查看自动连接与重连设置。'}
+ else if(i===13){out='Kill Switch 必须由 VPN 应用或系统网络扩展实现，网页无法启用或验证。'}
+ else if(i===14){out='VPN 协议识别需要系统隧道或服务端信息，网页无法可靠识别。'}
+ else if(i===15){out='网络切换对比：记录当前 Wi-Fi 下的公网 IP，再切换蜂窝网络并重新运行公网 IP 检测。网页无法读取 iOS 网络接口名称。'}
+ else if(i===16){out='断线提醒只能在页面保持打开时进行。可启动上方持续连通性监测；Safari 后台或锁屏时可能暂停，不能保证推送提醒。'}
+ else if(i===17){out='本次页面会话监测记录：\n'+(records.length?records.join('\n'):'暂无记录')+'\n刷新页面后记录会清空。'}
+ else if(i===18){downloadReport();return}
+ else if(i===19||i===41){out='使用下方“故障排查助手”，选择具体问题后点击生成步骤。'}
+ else if(i===20||i===21){await run('ipv6');return}
+ else if(i===22){out='IP 变化记录：先运行公网 IP 检测并记下结果；连接 VPN 或切换网络后再次检测比较。网页不会在后台自动记录。'}
+ else if(i===23){out='浏览器在线状态：'+(navigator.onLine?'浏览器报告在线':'浏览器报告离线')+'\n这不代表 VPN 隧道一定可用。'}
+ else if(i===24){out='页面可见性：'+(document.visibilityState==='visible'?'当前页面在前台':'当前页面不在前台')+'\nSafari 锁屏或切换应用时可能暂停脚本。'}
+ else if(i===30){out='连续响应时间记录：\n'+(records.length?records.join('\n'):'请先启动持续连通性监测。')}
+ else if(i===31){out='长时间监测只在网页保持活动时运行，iOS 后台与锁屏可能暂停计时器。'}
+ else if(i===32){out='普通网页不能稳定识别 iOS 当前使用 Wi-Fi 还是蜂窝数据。请在控制中心查看网络类型。'}
+ else if(i===33){out='低电量模式可能限制后台活动。建议测试期间保持 Safari 在前台，并避免锁屏。'}
+ else if(i===34){out='iOS Safari 后台限制：切换应用或锁屏后，网页计时器和网络请求可能暂停。'}
+ else if(i===35){out='VPN 前后对比：断开 VPN 运行公网 IP 与 HTTPS 检测并记录；连接 VPN 后重复检测，比较出口 IP 和耗时。'}
+ else if(i===37){await run('dns');return}
+ else if(i===38){await run('webrtc');return}
+ else if(i===39){out='浏览器安全检查：确认网址使用 HTTPS；不要在网站输入 VPN 密码、订阅链接、私钥或验证码。'}
+ else if(i===40){out='隐私检查清单\n• 不输入 VPN 密码或密钥\n• 仅使用可信 HTTPS 网站\n• 检查 VPN 应用的 DNS 与 Kill Switch 设置\n• 注意公网 IP 查询会访问第三方服务'}
+ else if(i===42){$('issue').value='none';diagnose();out=$('advice').textContent}
+ else if(i===43){$('issue').value='connected';diagnose();out=$('advice').textContent}
+ else if(i===44){$('issue').value='slow';diagnose();out=$('advice').textContent}
+ else if(i===45){$('issue').value='disconnect';diagnose();out=$('advice').textContent}
+ else if(i===46){$('issue').value='ip';diagnose();out=$('advice').textContent}
+ else if(i===47){$('issue').value='dns';diagnose();out=$('advice').textContent}
+ else if(i===48){$('issue').value='wifi';diagnose();out=$('advice').textContent}
+ else if(i===49){$('issue').value='wifi';diagnose();out=$('advice').textContent}
+ else{out=n+'：此工具已打开。'}
+ show(n+'\n\n'+out);
+ }catch(e){show(n+' 打开失败：'+(e.message||'未知错误')+'\n请重试。')}
+ finally{$('status').textContent='● 工具已就绪 · '+stamp()}
+}
 function diagnose(){let m={disconnect:'1. 检查 VPN Super 内自动连接及断线保护选项。\n2. 暂时关闭低电量模式进行对比。\n3. 检查 iOS VPN 配置是否仍存在。\n4. 分别测试 Wi-Fi 与蜂窝网络。',connected:'1. 断开后重新连接 VPN。\n2. 检测公网 IP 与 HTTPS。\n3. 检查 DNS 与分流设置。',slow:'1. 比较 VPN 开启前后的请求耗时。\n2. 更换应用内可选服务器。\n3. 检查网络信号与后台下载。',ip:'1. 重新查询公网 IP。\n2. 检查分流设置。\n3. 向 VPN Super 支持确认出口策略。',dns:'1. 检查 VPN 的 DNS 保护设置。\n2. 检查 iOS 自定义 DNS 或内容过滤配置。\n3. 使用可信 DNS 泄漏测试复核。',wifi:'1. 确认蜂窝数据允许 VPN Super 使用。\n2. 对比其他 Wi-Fi。\n3. 重启应用后测试。',none:'1. 确认普通互联网可用。\n2. 更新并重启 VPN Super。\n3. 检查 iOS VPN 配置。\n4. 联系官方支持。'};$('advice').textContent=m[$('issue').value]}
 addEventListener('online',()=>$('status').textContent='● 浏览器报告网络在线');addEventListener('offline',()=>$('status').textContent='● 浏览器报告网络离线');
 </script></body></html>
