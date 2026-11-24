@@ -69,10 +69,11 @@ The repository includes a read-only API layer:
 After deployment, test `/api/health` and `/api/diagnostics` on the Pages domain. Configure Cloudflare WAF/rate limiting for public `/api/*` endpoints. Checks originate from the Cloudflare edge and do not inspect private VPN provider nodes or iOS system VPN state.
 
 
-## Multi-region probing (RIPE Atlas)
 
-- `POST /api/regions/start` — create one-off IPv4 ping measurements from probes in NL, US, DE, SG, and/or JP (up to 3 probes requested per country).
-- `GET /api/regions/results?ids=...&countries=...` — retrieve latest per-probe results.
-- Configure encrypted Cloudflare Pages secrets `VPN_SUPER_API_KEY` and `RIPE_ATLAS_API_KEY` before use. The browser requires the app key at runtime; the RIPE key stays server-side.
-- RIPE Atlas measurement creation consumes credits. Measurements are one-off, not recurring. Probe availability varies by country.
-- See `docs/multi-region-probing.md` for setup and limitations.
+## Multi-region probing (Globalping)
+
+- POST /api/regions/start — create one-off ping measurements from Globalping public probes in NL, US, DE, SG, and/or JP (up to 3 probes requested per country).
+- GET /api/regions/results?ids=...&countries=... — retrieve measurement status and available per-probe results.
+- Configure only the encrypted Cloudflare Pages secret VPN_SUPER_API_KEY to protect the site's endpoints. No Globalping API key or account is required.
+- Globalping's unauthenticated public API documents a free limit of 250 tests/hour and up to 50 probes per measurement; rate limits may change.
+- See docs/multi-region-probing.md for setup and limitations.
