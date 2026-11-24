@@ -1,27 +1,22 @@
-# VPN Super API — Multi-region probing
+# VPN Super Assistant — Multi-region probing
 
-## Real multi-region measurements
+## Globalping public probe network
 
-This feature uses RIPE Atlas public probes to run one-off IPv4 ICMP ping measurements from selected countries to a public hostname or IPv4 target.
+This feature uses the public Globalping API to run distributed ping measurements from volunteer probes in selected countries. Supported country codes: NL, US, DE, SG, JP. Each country requests up to three probes. Actual availability depends on online volunteers in each location.
 
-Supported country codes: NL, US, DE, SG, JP. Each selected country requests up to 3 probes. Probe availability varies; a country may return fewer probes or no results. Results are asynchronous and may take time to appear.
+### Cloudflare Pages secret
 
-### Cloudflare Pages secrets
+In Cloudflare Dashboard → Workers & Pages → your Pages project → Settings → Variables and Secrets, configure one encrypted secret:
 
-In Cloudflare Dashboard → Workers & Pages → your Pages project → Settings → Variables and Secrets, add these as **encrypted secrets** for the production environment:
+- VPN_SUPER_API_KEY: a long random application key used to protect this site's measurement endpoints.
 
-- `VPN_SUPER_API_KEY`: generate a long random application key. This protects the measurement endpoints.
-- `RIPE_ATLAS_API_KEY`: your RIPE Atlas API key with permission to create measurements.
-
-Do not put either value in GitHub, source code, a public Pages variable, or a screenshot. The RIPE Atlas key is kept server-side. The browser asks for the application key when starting or retrieving a measurement; it is not saved by this website.
-
-RIPE Atlas measurement creation requires an API key with measurement-creation permission. It uses RIPE Atlas credits; review your balance and current credit rules before running measurements.
+No Globalping API key, account, or payment setup is required. Globalping's unauthenticated public API currently documents a free rate limit of 250 measurement tests/hour and up to 50 probes per measurement. Limits may change; handle HTTP 429 responses and avoid repeated refreshes.
 
 ### Endpoints
 
-`POST /api/regions/start`
+POST /api/regions/start
 
-Headers: `Authorization: Bearer YOUR_VPN_SUPER_API_KEY`, `Content-Type: application/json`
+Header: Authorization: Bearer YOUR_VPN_SUPER_API_KEY
 
 Body:
 ```json
@@ -31,24 +26,22 @@ Body:
 }
 ```
 
-The endpoint creates one measurement per selected country and returns RIPE Atlas measurement IDs.
+Creates one Globalping ping measurement per selected country and returns measurement IDs.
 
-`GET /api/regions/results?ids=123,456&countries=NL,US`
+GET /api/regions/results?ids=ID1,ID2&countries=NL,US
 
-Header: `Authorization: Bearer YOUR_VPN_SUPER_API_KEY`
+Header: Authorization: Bearer YOUR_VPN_SUPER_API_KEY
 
-Returns latest probe results, packet RTT samples, average RTT and probe IDs.
+Returns measurement status, probe metadata and available RTT summaries.
 
-### Safety and limits
+### Safety and limitations
 
-- Only public hostnames and public IPv4 addresses are accepted. URLs, local hostnames and private/reserved IPv4 ranges are rejected.
-- Maximum five countries and three requested probes per country per request.
-- Measurements are one-off; no recurring schedule is created.
-- The application key protects these endpoints. Rotate it if exposed.
-- The browser must not receive the RIPE Atlas API key.
-- These measurements show network reachability from RIPE Atlas probes to the specified target. They do not test a commercial VPN provider's private nodes or the user's iPhone tunnel.
-- RIPE Atlas probe availability, result timing, quotas and credit costs are controlled by RIPE Atlas.
+- Only public hostnames and public IPv4 addresses are accepted; local and private targets are rejected.
+- Up to five countries and three requested probes per country per request.
+- Globalping measurements are asynchronous; poll results responsibly.
+- The site's own VPN_SUPER_API_KEY remains server-side; no Globalping provider key is used.
+- Results show reachability from Globalping volunteer probes to the target. They do not test VPN provider private nodes or the user's iPhone VPN tunnel.
+- Probe availability, rate limits and API operation are controlled by Globalping.
 
-Official references:
-- https://atlas.ripe.net/docs/apis/rest-api-manual/measurements/creating-measurements/
-- https://atlas.ripe.net/docs/apis/rest-api-reference/measurements/measurements_latest/
+Official API specification: https://github.com/jsdelivr/globalping/blob/master/public/v1/spec.yaml
+Public API root: https://api.globalping.io
