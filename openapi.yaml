@@ -55,7 +55,7 @@ paths:
 
   /api/regions/start:
     post:
-      summary: Create one-off RIPE Atlas ping measurements in selected countries
+      summary: Create Globalping public multi-region ping measurements
       security:
         - bearerAuth: []
       requestBody:
@@ -72,12 +72,12 @@ paths:
                   maxItems: 5
                   items: { type: string, enum: [NL, US, DE, SG, JP] }
       responses:
-        "200": { description: Measurement IDs created }
-        "401": { description: Invalid application key }
-        "503": { description: Required Cloudflare secrets are not configured }
+        "200": { description: Globalping measurement IDs created }
+        "401": { description: Invalid site application key }
+        "503": { description: VPN_SUPER_API_KEY is not configured }
   /api/regions/results:
     get:
-      summary: Retrieve latest results for regional measurements
+      summary: Retrieve Globalping measurement results
       security:
         - bearerAuth: []
       parameters:
@@ -90,8 +90,8 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        "200": { description: Per-probe results and RTT samples }
-        "401": { description: Invalid application key }
+        "200": { description: Measurement status, probe metadata and RTT summaries }
+        "401": { description: Invalid site application key }
 components:
   securitySchemes:
     bearerAuth:
