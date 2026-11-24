@@ -42,6 +42,7 @@ Returns measurement status, probe metadata and available RTT summaries.
 - The site's own VPN_SUPER_API_KEY remains server-side; no Globalping provider key is used.
 - Results show reachability from Globalping volunteer probes to the target. They do not test VPN provider private nodes or the user's iPhone VPN tunnel.
 - Probe availability, rate limits and API operation are controlled by Globalping.
+- Globalping measurement details and results may be publicly accessible to anyone with the measurement ID. Never test private hostnames or include credentials, tokens, or sensitive data in a target.
 
 Official API specification: https://github.com/jsdelivr/globalping/blob/master/public/v1/spec.yaml
 Public API root: https://api.globalping.io
