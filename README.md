@@ -9,8 +9,8 @@ A free, mobile-first static website with browser-based network diagnostics for i
 3. Choose **Connect to Git** and select `pexshop/super-assistant`.
 4. Framework preset: **None**.
 5. Build command: leave empty.
-6. Build output directory: `/` (repository root).
-7. Click **Save and Deploy**.
+6. Build output directory: `.` (repository root).
+7. Click **Save and Deploy**. Wait for the deployment status to show **Success** before testing.
 
 The site is a static `index.html`; no build step, server, paid API key, or database is required.
 
@@ -44,4 +44,13 @@ Examples:
 
 The response includes request latency and the Cloudflare edge colo/country that handled this request, when available. This is a single edge-location test, **not** a global multi-region test and not a test of private VPN nodes. Only fixed allowlisted upstream targets are accepted; arbitrary URLs cannot be submitted, which helps prevent server-side request forgery.
 
-After connecting this repository to Cloudflare Pages, test `https://YOUR-PAGES-DOMAIN/api/probe`. The existing `workers.dev` URL is a separate Worker deployment and will not automatically receive Pages Functions from this repository.
+After connecting this repository to Cloudflare Pages, test `https://YOUR-PAGES-DOMAIN/api/probe`. The existing `workers.dev` URL is a separate Worker deployment and will not automatically receive Pages Functions from this repository. Do not test the Pages Function on the old `workers.dev` hostname unless you separately deploy the API to that Worker.
+
+### If deployment fails
+
+- Framework preset: **None**.
+- Build command: leave blank.
+- Build output directory: `.`.
+- Root directory: `/` (repository root), if the dashboard asks for it separately.
+- Confirm the selected production branch is `main`.
+- In the latest deployment details, inspect the build log; a GitHub commit alone does not trigger a deployment unless the Pages project is connected to this repository.
