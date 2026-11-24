@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: VPN Super API
+  version: 1.0.0
+  description: Read-only network and third-party service diagnostics for VPN Super Assistant.
+servers:
+  - url: https://YOUR-DOMAIN
+paths:
+  /api/health:
+    get:
+      summary: API health and version
+      responses:
+        "200":
+          description: Service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  service: { type: string }
+                  version: { type: string }
+                  status: { type: string }
+                  timestamp: { type: string, format: date-time }
+  /api/probe:
+    get:
+      summary: Probe one allowlisted external service
+      parameters:
+        - in: query
+          name: target
+          required: false
+          schema:
+            type: string
+            enum: [cloudflare, google, ipify, ipapi, doh_cloudflare, doh_google, speed]
+      responses:
+        "200":
+          description: Probe succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  target: { type: string }
+                  latencyMs: { type: integer }
+                  upstreamStatus: { type: integer }
+        "400": { description: Unsupported target }
+        "502": { description: Upstream failure }
+  /api/diagnostics:
+    get:
+      summary: Run all allowlisted service checks
+      responses:
+        "200": { description: All checks passed }
+        "207": { description: Partial check failure }
